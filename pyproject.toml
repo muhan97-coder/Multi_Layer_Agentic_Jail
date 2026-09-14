@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "multi-layer-agentic-jail"
+version = "0.0.0a0"
+description = "Offline T0-T2 advisory-only learning preview"
+requires-python = ">=3.12"
+dependencies = []
+license = {file = "LICENSE"}
+
+[project.scripts]
+mlaj = "agi_v8_1.runtime.free_tier_cli:main"
+
+[tool.setuptools]
+include-package-data = false
+packages = ["agi_v8_1", "agi_v8_1.agent_system", "agi_v8_1.agent_system.swarm_v8", "agi_v8_1.bridge", "agi_v8_1.bus", "agi_v8_1.capabilities", "agi_v8_1.core", "agi_v8_1.enforcement", "agi_v8_1.memory", "agi_v8_1.multimodal", "agi_v8_1.observability", "agi_v8_1.policy", "agi_v8_1.prompts", "agi_v8_1.providers", "agi_v8_1.runtime", "agi_v8_1.si_lanes", "agi_v8_1.state", "agi_v8_1.tools", "agi_v8_1.utils", "agi_v8_1.verifier"]
+
+[tool.setuptools.package-data]
+agi_v8_1 = ["public_assets/free_tiers/config.json", "public_assets/free_tiers/prompts/strategist.md", "public_assets/free_tiers/README.md", "public_assets/curriculum/local_tiers.json"]
