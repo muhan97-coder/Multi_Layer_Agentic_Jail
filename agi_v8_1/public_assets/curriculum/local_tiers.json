@@ -1,10 +1,10 @@
 {
   "schema": "agi-v8-public-local-curriculum/v1",
   "T1": {
-    "ack": "이 시스템은 젤(state_dir) 밖으로는 아무것도 쓰지 않는다"
+    "ack": "이 시스템은 젤(state_dir) 밖으로는 아무것도 쓰지 않는다 / This system writes nothing outside the state directory (state_dir)"
   },
   "T2": {
-    "ack": "성공 횟수가 아니라 서로 다른 사이클의 원장 증거를 확인한다",
+    "ack": "성공 횟수가 아니라 서로 다른 사이클의 원장 증거를 확인한다 / I check the ledger evidence of distinct cycles, not a success count",
     "minimum_distinct_cycles": 2,
     "calibration": "Initial local-only minimum: two distinct completed cycles; not a server promotion threshold."
   }

@@ -27,9 +27,65 @@ REQUIRED_CHECKS = frozenset({
     "t0_tick_master_off",
 })
 
+_FD_PATH_RESOLVER = r'''
+def _fd_path(fd, *, directory=False):
+    # This source is embedded verbatim in the isolated child, before its audit
+    # hook is installed. Tests execute the same source with injected OS APIs.
+    try:
+        if type(fd) is not int or fd < 0:
+            raise ValueError('invalid_descriptor')
+        held = os.fstat(fd)
+        if held.st_nlink < 1 or (directory and not stat.S_ISDIR(held.st_mode)):
+            raise ValueError('unlinked_or_not_directory')
+        if sys.platform == 'linux':
+            raw = os.readlink('/proc/self/fd/' + str(fd))
+        elif sys.platform == 'darwin':
+            # Apple MAXPATHLEN == PATH_MAX == 1024; Python fcntl's bytes
+            # interface returns the same-sized buffer and permits <=1024.
+            # Use the published constant, never a guessed numeric command.
+            if fcntl is None or type(getattr(fcntl, 'F_GETPATH', None)) is not int:
+                raise ValueError('getpath_unavailable')
+            buffer = fcntl.fcntl(fd, fcntl.F_GETPATH, b'\0' * 1024)
+            if type(buffer) is not bytes or len(buffer) != 1024:
+                raise ValueError('invalid_getpath_buffer')
+            raw, terminator, padding = buffer.partition(b'\0')
+            if not terminator or any(padding):
+                raise ValueError('unterminated_or_malformed_getpath')
+        else:
+            raise ValueError('unsupported_descriptor_platform')
+        raw = os.fsdecode(raw)
+        if not raw or '\0' in raw or not os.path.isabs(raw):
+            raise ValueError('invalid_descriptor_path')
+        resolved = Path(os.path.realpath(raw, strict=True))
+        named, current = os.stat(resolved, follow_symlinks=False), os.fstat(fd)
+        identity = lambda value: (value.st_dev, value.st_ino, stat.S_IFMT(value.st_mode))
+        if (named.st_nlink < 1 or current.st_nlink < 1
+                or not identity(held) == identity(named) == identity(current)):
+            raise ValueError('descriptor_path_identity_changed')
+        return resolved
+    except (OSError, ValueError, TypeError, AttributeError, OverflowError, NotImplementedError):
+        # A caught refusal still poisons the final receipt; no cwd fallback.
+        refuse('fd_path_unavailable')
+def resolved_path(raw, dir_fd=None):
+    if isinstance(raw, int):
+        return _fd_path(raw)
+    raw = os.fsdecode(raw)
+    if not os.path.isabs(raw) and dir_fd not in (None, -1):
+        raw = os.path.join(_fd_path(dir_fd, directory=True), raw)
+    return Path(os.path.realpath(raw))
+'''
+
+
 _BOOTSTRAP = r'''
-import json, os, sys
+import json, os, stat, sys
 from pathlib import Path
+# Import the Darwin extension before installing the import/read audit boundary.
+fcntl = None
+if sys.platform == 'darwin':
+    try:
+        import fcntl
+    except ImportError:
+        fcntl = None
 root, original, jail = map(lambda p: Path(p).resolve(), sys.argv[1:4])
 writable = [False, 'imports']
 effects = []
@@ -46,13 +102,7 @@ def refuse(code):
         frame = frame.f_back
     effect_sites.append(sites)
     raise PermissionError(code)
-def resolved_path(raw, dir_fd=None):
-    if isinstance(raw, int):
-        raw = os.readlink('/proc/self/fd/' + str(raw))
-    raw = os.fsdecode(raw)
-    if not os.path.isabs(raw) and dir_fd not in (None, -1):
-        raw = os.path.join(os.readlink('/proc/self/fd/' + str(dir_fd)), raw)
-    return Path(os.path.realpath(raw))
+''' + _FD_PATH_RESOLVER + r'''
 def check_open_path(path, writing):
     if within(path, original):
         refuse('original_checkout')
