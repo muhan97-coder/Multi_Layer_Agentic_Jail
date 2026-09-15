@@ -100,6 +100,17 @@ mlaj --state-dir /abs/private/dir ledger
 
 Higher tiers are planned to be offered through a separate enrolment site that issues signed tokens and delivers encrypted per-tier modules; that site is not part of this repository, and higher-tier issuance and delivery are not yet publicly open. The gate module ships a token importer, but with an empty built-in trust-key list it refuses explicitly. Already-held higher tiers are never overwritten by an older, lower token.
 
+### The road from T2 to T3 — written down now, shipped in the next cut
+
+T3 is the first tier that does not take your machine's word for it: a server has to see evidence and hand you a signed token. The path has four legs. None of them run in this cut — the two local commands, the installer and the trust keys ship with the next cut, and the enrolment site opens with it.
+
+1. **Local exercise and export.** From a state directory that is already at T2, run `mlaj --state-dir /abs/state tool-use --repo-commit <release commit>` once. It is a synthetic, offline exercise of the cost-reconciliation tool: it writes a receipt into your state directory, calls no provider and pays nothing. Then run `mlaj --state-dir /abs/state export-evidence --repo-commit <release commit>`, which prints exactly `{repo_commit, evidence_digest, summary}`. The release commit is the full 40-hex id of the cut you installed; the site shows it next to the request form.
+2. **Request on the enrolment site.** Sign in with GitHub, register the browser (an Ed25519 device key that stays in that browser), paste the export, read and acknowledge the T3 sentence — *"I run one real provider worker lane with my own API key under a hard cost cap, and every cost it incurs is mine"* — and sign the request with the device key. The token service recomputes the evidence digest, checks the acknowledgement digest and the release commit, and issues a signed token bound to a pseudonym derived from your GitHub id and to that commit. Refusals count against a daily quota. A token is not a key and unlocks nothing by itself.
+3. **Module delivery.** Higher-tier code is not in this repository. With an active token the site lets you download the tier's encrypted module (`<module>.manifest.json` and `<module>.payload.bin`) and, after a fresh status check signed by the same browser, delivers the content key once (`<module>.key-delivery.json`). The delivery is recorded and the key is never shown again.
+4. **Install and activate.** The local installer verifies the manifest signature against the trust keys shipped with that cut, the payload sha256 and the AES-GCM tag before it writes anything, and refuses on any mismatch. Activating the T3 worker lane takes your own provider API key and a hard cost cap, and it stays off until you turn it on.
+
+What holds at every leg: nothing is written outside your state directory except the files you choose to download; no provider is called and nothing is paid until you activate T3 yourself; the token service only ever sees the pseudonym, never your GitHub id. Tiers above T3 add a waiting period between steps (server clock) and their own evidence — the table above says what each one asks for.
+
 ## Two honest notes about the gate
 
 - The shipped `public_assets/free_tiers/config.json` leaves `AGI_V8_PUBLIC_TIER_GATE_ENABLED` at `false`. The CLI turns the gate on for each call; library callers who leave it off get no enforcement at all, which is documented behaviour, not a bug.
